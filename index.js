@@ -244,11 +244,73 @@ class Grid {
   }
 }
 
+class Bomb {
+  static radius = 30;
+  constructor({ position, velocity }) {
+    this.position = position;
+    this.velocity = velocity;
+    this.radius = 30;
+    this.color = "red";
+  }
+
+  draw() {
+    c.beginPath();
+    c.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
+    c.closePath();
+    c.fillStyle = this.color;
+    c.fill();
+  }
+
+  update() {
+    this.draw();
+    this.position.x += this.velocity.x;
+    this.position.y += this.velocity.y;
+
+    if (
+      this.position.x + this.radius + this.velocity.x >= canvas.width ||
+      this.position.x - this.radius + this.velocity.x <= 0
+    ) {
+      this.velocity.x = -this.velocity.x;
+    } else if (
+      this.position.y + this.radius + this.velocity.y >= canvas.height ||
+      this.position.y - this.radius + this.velocity.y <= 0
+    ) {
+      this.velocity.y = -this.velocity.y;
+    }
+  }
+}
+
+function randomBetween(min, max) {
+  return Math.random() * (max - min) + min;
+}
+
 const player = new Player();
 const projectiles = [];
 const invaderProjectiles = [];
 const particles = [];
 const grids = [];
+const bombs = [
+  new Bomb({
+    position: {
+      x: randomBetween(Bomb.radius, canvas.width - Bomb.radius),
+      y: randomBetween(Bomb.radius, canvas.height - Bomb.radius),
+    },
+    velocity: {
+      x: (Math.random() - 0.5) * 10,
+      y: (Math.random() - 0.5) * 10,
+    },
+  }),
+  new Bomb({
+    position: {
+      x: randomBetween(Bomb.radius, canvas.width - Bomb.radius),
+      y: randomBetween(Bomb.radius, canvas.height - Bomb.radius),
+    },
+    velocity: {
+      x: (Math.random() - 0.5) * 10,
+      y: (Math.random() - 0.5) * 10,
+    },
+  }),
+];
 
 const keys = {
   ArrowLeft: {
@@ -317,6 +379,12 @@ function animate() {
   c.fillStyle = "black";
   c.fillRect(0, 0, canvas.width, canvas.height);
   //   c.clearRect(0, 0, canvas.width, canvas.height);
+
+  for (let i = bombs.length - 1; i >= 0; i--) {
+    const bomb = bombs[i];
+    bomb.update();
+  }
+
   player.update();
 
   particles.forEach((particle, index) => {
@@ -369,15 +437,31 @@ function animate() {
     }
   });
 
-  projectiles.forEach((projectile, index) => {
+  // TIME IS 24:15
+
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const projectile = projectiles[i];
+    for (let j = bombs.length - 1; j >= 0; j--) {
+      const bomb = bombs[j];
+
+      if (
+        Math.hypot(
+          projectile.position.x - bomb.position.x,
+          projectile.position.y - bomb.position.y
+        ) <
+        projectile.radius + bomb.radius
+      ) {
+        // if bomb touches projectile, remove bomb
+        projectiles.splice(j, 1);
+      }
+    }
+
     if (projectile.position.y + projectile.radius <= 0) {
-      setTimeout(() => {
-        projectiles.splice(index, 1);
-      }, 0);
+      projectiles.splice(i, 1);
     } else {
       projectile.update();
     }
-  });
+  }
 
   grids.forEach((grid, gridIndex) => {
     grid.update();
@@ -416,6 +500,27 @@ function animate() {
             if (invaderFound && projectileFound) {
               score += 100;
               scoreEl.innerHTML = score;
+
+              // dynamic score labels
+              const scoreLabel = document.createElement("label");
+              scoreLabel.innerHTML = "+100";
+              scoreLabel.style.position = "absolute";
+              scoreLabel.style.color = "white";
+              scoreLabel.style.top = invader.position.y + "px";
+              scoreLabel.style.left = invader.position.x + "px";
+              scoreLabel.style.userSelect = "none";
+
+              document.querySelector("#parentDiv").appendChild(scoreLabel);
+
+              gsap.to(scoreLabel, {
+                opacity: 0,
+                y: -30,
+                duration: 0.75,
+                onComplete: () => {
+                  document.querySelector("#parentDiv").removeChild(scoreLabel);
+                },
+              });
+
               // invader explodes
               createParticles({ object: invader, fades: true });
 
