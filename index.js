@@ -249,16 +249,25 @@ class Bomb {
   constructor({ position, velocity }) {
     this.position = position;
     this.velocity = velocity;
-    this.radius = 30;
+    this.radius = 0;
     this.color = "red";
+    this.opacity = 1;
+    this.active = false;
+
+    gsap.to(this, {
+      radius: 30,
+    });
   }
 
   draw() {
+    c.save();
+    c.globalAlpha = this.opacity;
     c.beginPath();
     c.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
     c.closePath();
     c.fillStyle = this.color;
     c.fill();
+    c.restore();
   }
 
   update() {
@@ -278,6 +287,22 @@ class Bomb {
       this.velocity.y = -this.velocity.y;
     }
   }
+
+  explode() {
+    this.active = true;
+    this.velocity.x = 0;
+    this.velocity.y = 0;
+    gsap.to(this, {
+      radius: 200,
+      color: "white",
+    });
+
+    gsap.to(this, {
+      delay: 0.1,
+      opacity: 0,
+      duration: 0.15,
+    });
+  }
 }
 
 function randomBetween(min, max) {
@@ -289,28 +314,7 @@ const projectiles = [];
 const invaderProjectiles = [];
 const particles = [];
 const grids = [];
-const bombs = [
-  new Bomb({
-    position: {
-      x: randomBetween(Bomb.radius, canvas.width - Bomb.radius),
-      y: randomBetween(Bomb.radius, canvas.height - Bomb.radius),
-    },
-    velocity: {
-      x: (Math.random() - 0.5) * 10,
-      y: (Math.random() - 0.5) * 10,
-    },
-  }),
-  new Bomb({
-    position: {
-      x: randomBetween(Bomb.radius, canvas.width - Bomb.radius),
-      y: randomBetween(Bomb.radius, canvas.height - Bomb.radius),
-    },
-    velocity: {
-      x: (Math.random() - 0.5) * 10,
-      y: (Math.random() - 0.5) * 10,
-    },
-  }),
-];
+const bombs = [];
 
 const keys = {
   ArrowLeft: {
@@ -371,6 +375,27 @@ function createParticles({ object, color, fades }) {
   }
 }
 
+function createScoreLabel({ score = 100, object }) {
+  const scoreLabel = document.createElement("label");
+  scoreLabel.innerHTML = `+${score}`;
+  scoreLabel.style.position = "absolute";
+  scoreLabel.style.color = "white";
+  scoreLabel.style.top = object.position.y + "px";
+  scoreLabel.style.left = object.position.x + "px";
+  scoreLabel.style.userSelect = "none";
+
+  document.querySelector("#parentDiv").appendChild(scoreLabel);
+
+  gsap.to(scoreLabel, {
+    opacity: 0,
+    y: -30,
+    duration: 0.75,
+    onComplete: () => {
+      document.querySelector("#parentDiv").removeChild(scoreLabel);
+    },
+  });
+}
+
 function animate() {
   if (!game.active) return;
 
@@ -380,8 +405,27 @@ function animate() {
   c.fillRect(0, 0, canvas.width, canvas.height);
   //   c.clearRect(0, 0, canvas.width, canvas.height);
 
+  if (frames % 200 === 0 && bombs.length < 3) {
+    bombs.push(
+      new Bomb({
+        position: {
+          x: randomBetween(Bomb.radius, canvas.width - Bomb.radius),
+          y: randomBetween(Bomb.radius, canvas.height - Bomb.radius),
+        },
+        velocity: {
+          x: (Math.random() - 0.5) * 10,
+          y: (Math.random() - 0.5) * 10,
+        },
+      })
+    );
+  }
+
   for (let i = bombs.length - 1; i >= 0; i--) {
     const bomb = bombs[i];
+
+    if (bomb.opacity <= 0) {
+      bombs.splice(i, 1);
+    }
     bomb.update();
   }
 
@@ -449,10 +493,12 @@ function animate() {
           projectile.position.x - bomb.position.x,
           projectile.position.y - bomb.position.y
         ) <
-        projectile.radius + bomb.radius
+          projectile.radius + bomb.radius &&
+        !bomb.active
       ) {
-        // if bomb touches projectile, remove bomb
-        projectiles.splice(j, 1);
+        // if projectile touches bomb, remove projectile
+        projectiles.splice(i, 1);
+        bomb.explode();
       }
     }
 
@@ -474,8 +520,35 @@ function animate() {
       );
     }
 
-    grid.invaders.forEach((invader, i) => {
+    for (let i = grid.invaders.length - 1; i >= 0; i--) {
+      const invader = grid.invaders[i];
       invader.update({ velocity: grid.velocity });
+
+      for (let j = bombs.length - 1; j >= 0; j--) {
+        const bomb = bombs[j];
+
+        const invaderRadius = 15;
+
+        if (
+          Math.hypot(
+            invader.position.x - bomb.position.x,
+            invader.position.y - bomb.position.y
+          ) <
+            invaderRadius + bomb.radius &&
+          bomb.active
+        ) {
+          // if bomb touches invader, remove invader
+          score += 50;
+          scoreEl.innerHTML = score;
+          grid.invaders.splice(i, 1);
+          createScoreLabel({ object: invader, score: 50 });
+
+          createParticles({
+            object: invader,
+            fades: true,
+          });
+        }
+      }
 
       // projectiles hit enemy
       projectiles.forEach((projectile, j) => {
@@ -502,24 +575,7 @@ function animate() {
               scoreEl.innerHTML = score;
 
               // dynamic score labels
-              const scoreLabel = document.createElement("label");
-              scoreLabel.innerHTML = "+100";
-              scoreLabel.style.position = "absolute";
-              scoreLabel.style.color = "white";
-              scoreLabel.style.top = invader.position.y + "px";
-              scoreLabel.style.left = invader.position.x + "px";
-              scoreLabel.style.userSelect = "none";
-
-              document.querySelector("#parentDiv").appendChild(scoreLabel);
-
-              gsap.to(scoreLabel, {
-                opacity: 0,
-                y: -30,
-                duration: 0.75,
-                onComplete: () => {
-                  document.querySelector("#parentDiv").removeChild(scoreLabel);
-                },
-              });
+              createScoreLabel({ object: invader });
 
               // invader explodes
               createParticles({ object: invader, fades: true });
@@ -543,7 +599,7 @@ function animate() {
           }, 0);
         }
       });
-    });
+    }
   });
 
   if (keys.ArrowLeft.pressed && player.position.x >= 0) {
