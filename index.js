@@ -31,6 +31,9 @@ class Player {
         y: canvas.height - this.height - 20,
       };
     };
+
+    this.particles = [];
+    this.frames = 0;
   }
 
   draw() {
@@ -66,6 +69,24 @@ class Player {
     if (this.image) {
       this.draw();
       this.position.x += this.velocity.x;
+    }
+    this.frames++;
+    if (this.frames % 2 === 0 && player.opacity > 0) {
+      this.particles.push(
+        new Particle({
+          position: {
+            x: this.position.x + this.width / 2,
+            y: this.position.y + this.height,
+          },
+          velocity: {
+            x: (Math.random() - 0.5) * 1.5,
+            y: 3,
+          },
+          radius: Math.random() * 2 + 1.5,
+          color: "white",
+          fades: true,
+        })
+      );
     }
   }
 }
@@ -261,7 +282,9 @@ class Grid {
     this.velocity.y = 0;
 
     if (this.position.x + this.width >= canvas.width || this.position.x <= 0) {
-      this.velocity.x = -this.velocity.x;
+      // increase speed by about 15% each time a side is hit
+      this.velocity.x = -this.velocity.x * 1.15;
+
       this.velocity.y = 30;
     }
   }
@@ -420,6 +443,29 @@ function createScoreLabel({ score = 100, object }) {
   });
 }
 
+let spawnBuffer = 500;
+
+function rectangularCollision({ rectangle1, rectangle2 }) {
+  return (
+    rectangle1.position.y + rectangle1.height >= rectangle2.position.y &&
+    rectangle1.position.x + rectangle1.width >= rectangle2.position.x &&
+    rectangle1.position.x <= rectangle2.position.x + rectangle2.width
+  );
+}
+
+function endGame() {
+  setTimeout(() => {
+    player.opacity = 0;
+    game.over = true;
+  }, 0);
+
+  setTimeout(() => {
+    game.active = false;
+  }, 2000);
+
+  createParticles({ object: player, color: "white", fades: true });
+}
+
 function animate() {
   if (!game.active) return;
 
@@ -480,6 +526,12 @@ function animate() {
 
   player.update();
 
+  for (let i = player.particles.length - 1; i >= 0; i--) {
+    const particle = player.particles[i];
+
+    particle.update();
+  }
+
   particles.forEach((particle, index) => {
     // regen stars
     if (particle.position.y - particle.radius >= canvas.height) {
@@ -507,26 +559,15 @@ function animate() {
     } else invaderProjectile.update();
 
     if (
-      invaderProjectile.position.y + invaderProjectile.height >=
-        player.position.y &&
-      invaderProjectile.position.x + invaderProjectile.width >=
-        player.position.x &&
-      invaderProjectile.position.x <= player.position.x + player.width
+      rectangularCollision({
+        rectangle1: invaderProjectile,
+        rectangle2: player,
+      })
     ) {
       // You lose
       // projectile hits player
-
-      setTimeout(() => {
-        invaderProjectiles.splice(index, 1);
-        player.opacity = 0;
-        game.over = true;
-      }, 0);
-
-      setTimeout(() => {
-        game.active = false;
-      }, 2000);
-
-      createParticles({ object: player, color: "white", fades: true });
+      invaderProjectiles.splice(index, 1);
+      endGame();
     }
   });
 
@@ -668,6 +709,16 @@ function animate() {
           }, 0);
         }
       });
+      // remove player if invader touches player
+      if (
+        rectangularCollision({
+          rectangle1: invader,
+          rectangle2: player,
+        }) &&
+        !game.over
+      ) {
+        endGame();
+      }
     }
   });
 
@@ -687,15 +738,19 @@ function animate() {
 
   // spawning invaders
   if (frames % randomInterval === 0) {
+    // can set  < ? 100 : to make it easier
+    spawnBuffer = spawnBuffer < 0 ? 0 : spawnBuffer;
     grids.push(new Grid());
-    randomInterval = Math.floor(Math.random() * 500 + 500);
+    randomInterval = Math.floor(Math.random() * 500 + spawnBuffer);
     frames = 0;
+    spawnBuffer -= 100;
   }
 
   if (
     keys.space.pressed &&
     player.powerUp === "MachineGun" &&
-    frames % 6 === 0
+    frames % 4 === 0 &&
+    player.opacity > 0
   ) {
     projectiles.push(
       new Projectile({
@@ -737,8 +792,6 @@ window.addEventListener("keydown", ({ key }) => {
           velocity: { x: 0, y: -SHIP_PROJECTILE },
         })
       );
-      console.log(projectiles);
-      //   keys.space.pressed = true;
       break;
   }
 });
