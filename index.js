@@ -5,9 +5,9 @@ const c = canvas.getContext("2d");
 canvas.width = 1024;
 canvas.height = 576;
 
-const SHIP_VELOCITY = 20;
+const SHIP_VELOCITY = 15;
 const ROTATION = 0.3;
-const SHIP_PROJECTILE = 20;
+const SHIP_PROJECTILE = 15;
 
 class Player {
   constructor() {
@@ -71,16 +71,39 @@ class Player {
 }
 
 class Projectile {
-  constructor({ position, velocity }) {
+  constructor({ position, velocity, color = "red" }) {
     this.position = position;
     this.velocity = velocity;
-    this.radius = 5;
+    this.radius = 4;
+    this.color = color;
   }
 
   draw() {
     c.beginPath();
     c.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
-    c.fillStyle = "red";
+    c.fillStyle = this.color;
+    c.fill();
+    c.closePath();
+  }
+
+  update() {
+    this.draw();
+    this.position.x += this.velocity.x;
+    this.position.y += this.velocity.y;
+  }
+}
+
+class PowerUp {
+  constructor({ position, velocity }) {
+    this.position = position;
+    this.velocity = velocity;
+    this.radius = 10;
+  }
+
+  draw() {
+    c.beginPath();
+    c.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
+    c.fillStyle = "yellow";
     c.fill();
     c.closePath();
   }
@@ -315,6 +338,7 @@ const invaderProjectiles = [];
 const particles = [];
 const grids = [];
 const bombs = [];
+const powerUps = [];
 
 const keys = {
   ArrowLeft: {
@@ -404,7 +428,32 @@ function animate() {
   c.fillStyle = "black";
   c.fillRect(0, 0, canvas.width, canvas.height);
   //   c.clearRect(0, 0, canvas.width, canvas.height);
+  for (let i = powerUps.length - 1; i >= 0; i--) {
+    const powerUp = powerUps[i];
+    if (powerUp.position.x - powerUp.radius >= canvas.width) {
+      powerUps.splice(i, 1);
+    } else {
+      powerUp.update();
+    }
+  }
 
+  // spawn power ups
+  if (frames % 700 === 0) {
+    powerUps.push(
+      new PowerUp({
+        position: {
+          x: 0,
+          y: Math.random() * 300 + 15,
+        },
+        velocity: {
+          x: Math.random() * 2 + 1,
+          y: 0,
+        },
+      })
+    );
+  }
+
+  // spawn bombs
   if (frames % 200 === 0 && bombs.length < 3) {
     bombs.push(
       new Bomb({
@@ -499,6 +548,26 @@ function animate() {
         // if projectile touches bomb, remove projectile
         projectiles.splice(i, 1);
         bomb.explode();
+      }
+    }
+
+    for (let j = powerUps.length - 1; j >= 0; j--) {
+      const powerUp = powerUps[j];
+
+      if (
+        Math.hypot(
+          projectile.position.x - powerUp.position.x,
+          projectile.position.y - powerUp.position.y
+        ) <
+        projectile.radius + powerUp.radius
+      ) {
+        // if projectile touches bomb, remove projectile
+        projectiles.splice(i, 1);
+        powerUps.splice(j, 1);
+        player.powerUp = "MachineGun";
+        setTimeout(() => {
+          player.powerUp = null;
+        }, 5000);
       }
     }
 
@@ -623,6 +692,23 @@ function animate() {
     frames = 0;
   }
 
+  if (
+    keys.space.pressed &&
+    player.powerUp === "MachineGun" &&
+    frames % 6 === 0
+  ) {
+    projectiles.push(
+      new Projectile({
+        position: {
+          x: player.position.x + player.width / 2,
+          y: player.position.y,
+        },
+        velocity: { x: 0, y: -SHIP_PROJECTILE },
+        color: "yellow ",
+      })
+    );
+  }
+
   frames++;
 }
 
@@ -638,6 +724,10 @@ window.addEventListener("keydown", ({ key }) => {
       keys.ArrowRight.pressed = true;
       break;
     case " ":
+      keys.space.pressed = true;
+
+      if (player.powerUp === "MachineGun") return;
+
       projectiles.push(
         new Projectile({
           position: {
@@ -654,7 +744,6 @@ window.addEventListener("keydown", ({ key }) => {
 });
 
 window.addEventListener("keyup", ({ key }) => {
-  console.log(key);
   switch (key) {
     case "ArrowLeft":
       keys.ArrowLeft.pressed = false;
@@ -663,8 +752,7 @@ window.addEventListener("keyup", ({ key }) => {
       keys.ArrowRight.pressed = false;
       break;
     case " ":
-      console.log("fire");
-      // keys.space.pressed = true;
+      keys.space.pressed = false;
       break;
   }
 });
