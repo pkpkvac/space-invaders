@@ -150,12 +150,12 @@ class InvaderProjectile {
     this.position = position;
     this.velocity = velocity;
 
-    this.width = 3;
+    this.width = 5;
     this.height = 10;
   }
 
   draw() {
-    c.fillStyle = "white";
+    c.fillStyle = "pink";
     c.fillRect(this.position.x, this.position.y, this.width, this.height);
   }
 
@@ -214,7 +214,7 @@ class Invader {
         },
         velocity: {
           x: 0,
-          y: 10,
+          y: 7,
         },
       })
     );
@@ -353,7 +353,7 @@ const keys = {
 };
 
 let frames = 0;
-let randomInterval = Math.floor(Math.random() * 500 + 500);
+let randomInterval = Math.floor(Math.random() * 500 + 200);
 let game = {
   over: false,
   active: true,
@@ -583,7 +583,7 @@ function animate() {
 
     // spawn projectiles
     // reduce % 100 for faster invader projectiles
-    if (frames % 100 === 0 && grid.invaders.length > 0) {
+    if (frames % 60 === 0 && grid.invaders.length > 0) {
       grid.invaders[Math.floor(Math.random() * grid.invaders.length)].shoot(
         invaderProjectiles
       );
@@ -685,7 +685,7 @@ function animate() {
     player.rotation = 0;
   }
 
-  // spawning enemies
+  // spawning invaders
   if (frames % randomInterval === 0) {
     grids.push(new Grid());
     randomInterval = Math.floor(Math.random() * 500 + 500);
