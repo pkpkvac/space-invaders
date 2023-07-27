@@ -355,15 +355,15 @@ function randomBetween(min, max) {
   return Math.random() * (max - min) + min;
 }
 
-const player = new Player();
-const projectiles = [];
-const invaderProjectiles = [];
-const particles = [];
-const grids = [];
-const bombs = [];
-const powerUps = [];
+let player = new Player();
+let projectiles = [];
+let invaderProjectiles = [];
+let particles = [];
+let grids = [];
+let bombs = [];
+let powerUps = [];
 
-const keys = {
+let keys = {
   ArrowLeft: {
     pressed: false,
   },
@@ -384,22 +384,53 @@ let game = {
 
 let score = 0;
 
-// Create stars
-for (let i = 0; i < 150; i++) {
-  particles.push(
-    new Particle({
-      position: {
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-      },
-      velocity: {
-        x: 0,
-        y: 0.4,
-      },
-      radius: Math.random() * 2,
-      color: "white",
-    })
-  );
+function init() {
+  player = new Player();
+  projectiles = [];
+  invaderProjectiles = [];
+  particles = [];
+  grids = [];
+  bombs = [];
+  powerUps = [];
+
+  keys = {
+    ArrowLeft: {
+      pressed: false,
+    },
+    ArrowRight: {
+      pressed: false,
+    },
+    space: {
+      pressed: false,
+    },
+  };
+
+  frames = 0;
+  randomInterval = Math.floor(Math.random() * 500 + 200);
+  game = {
+    over: false,
+    active: true,
+  };
+
+  score = 0;
+
+  // Create stars
+  for (let i = 0; i < 150; i++) {
+    particles.push(
+      new Particle({
+        position: {
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+        },
+        velocity: {
+          x: 0,
+          y: 0.4,
+        },
+        radius: Math.random() * 2,
+        color: "white",
+      })
+    );
+  }
 }
 
 function createParticles({ object, color, fades }) {
@@ -454,13 +485,16 @@ function rectangularCollision({ rectangle1, rectangle2 }) {
 }
 
 function endGame() {
+  // Makes player disappear
   setTimeout(() => {
     player.opacity = 0;
     game.over = true;
   }, 0);
 
+  // stops game altogheer
   setTimeout(() => {
     game.active = false;
+    document.querySelector("#restartScreen").style.display = "flex";
   }, 2000);
 
   createParticles({ object: player, color: "white", fades: true });
@@ -530,6 +564,10 @@ function animate() {
     const particle = player.particles[i];
 
     particle.update();
+
+    if (particle.opacity === 0) {
+      player.particles.splice(i, 1);
+    }
   }
 
   particles.forEach((particle, index) => {
@@ -767,7 +805,20 @@ function animate() {
   frames++;
 }
 
-animate();
+document.querySelector("#startButton").addEventListener("click", () => {
+  document.querySelector("#startScreen").style.display = "none";
+  document.querySelector("#scoreContainer").style.display = "block";
+
+  init();
+  animate();
+});
+
+document.querySelector("#restartButton").addEventListener("click", () => {
+  document.querySelector("#restartScreen").style.display = "none";
+
+  init();
+  animate();
+});
 
 window.addEventListener("keydown", ({ key }) => {
   if (game.over) return;
