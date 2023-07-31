@@ -227,6 +227,7 @@ class Invader {
   }
 
   shoot(invaderProjectiles) {
+    audio.enemyShoot.play();
     invaderProjectiles.push(
       new InvaderProjectile({
         position: {
@@ -335,6 +336,7 @@ class Bomb {
   }
 
   explode() {
+    audio.bomb.play();
     this.active = true;
     this.velocity.x = 0;
     this.velocity.y = 0;
@@ -485,6 +487,7 @@ function rectangularCollision({ rectangle1, rectangle2 }) {
 }
 
 function endGame() {
+  audio.gameOver.play();
   // Makes player disappear
   setTimeout(() => {
     player.opacity = 0;
@@ -500,10 +503,22 @@ function endGame() {
   createParticles({ object: player, color: "white", fades: true });
 }
 
+let msPrev = window.performance.now();
+let fps = 100;
+let fpsInterval = 1000 / fps;
+
 function animate() {
   if (!game.active) return;
 
   requestAnimationFrame(animate);
+
+  const msNow = window.performance.now();
+  const elapsed = msNow - msPrev;
+
+  // 1 second / 60 frames per second
+  if (elapsed < fpsInterval) return;
+
+  msPrev = msNow - (elapsed % fpsInterval);
 
   c.fillStyle = "black";
   c.fillRect(0, 0, canvas.width, canvas.height);
@@ -644,6 +659,7 @@ function animate() {
         projectiles.splice(i, 1);
         powerUps.splice(j, 1);
         player.powerUp = "MachineGun";
+        audio.bonus.play();
         setTimeout(() => {
           player.powerUp = null;
         }, 5000);
@@ -728,6 +744,8 @@ function animate() {
               // invader explodes
               createParticles({ object: invader, fades: true });
 
+              audio.explode.play();
+
               grid.invaders.splice(i, 1);
               projectiles.splice(j, 1);
 
@@ -787,9 +805,12 @@ function animate() {
   if (
     keys.space.pressed &&
     player.powerUp === "MachineGun" &&
-    frames % 4 === 0 &&
+    frames % 2 === 0 &&
     player.opacity > 0
   ) {
+    if (frames % 6 === 0) {
+      audio.shoot.play();
+    }
     projectiles.push(
       new Projectile({
         position: {
@@ -806,6 +827,9 @@ function animate() {
 }
 
 document.querySelector("#startButton").addEventListener("click", () => {
+  audio.backgroundMusic.play();
+  audio.start.play();
+
   document.querySelector("#startScreen").style.display = "none";
   document.querySelector("#scoreContainer").style.display = "block";
 
@@ -814,6 +838,7 @@ document.querySelector("#startButton").addEventListener("click", () => {
 });
 
 document.querySelector("#restartButton").addEventListener("click", () => {
+  audio.select.play();
   document.querySelector("#restartScreen").style.display = "none";
 
   init();
@@ -834,6 +859,7 @@ window.addEventListener("keydown", ({ key }) => {
 
       if (player.powerUp === "MachineGun") return;
 
+      audio.shoot.play();
       projectiles.push(
         new Projectile({
           position: {
